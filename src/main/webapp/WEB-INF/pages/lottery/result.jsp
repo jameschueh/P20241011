@@ -40,7 +40,7 @@
         </table>
         
         <div class="text-center mt-4">
-            <a href="../P20240930/index.jsp" class="btn btn-secondary mt-2">返回首頁</a>
+            <a href="../P20240930/index" class="btn btn-secondary mt-2">返回首頁</a>
             <br></br>
             <form action="logout" method="GET">
                 <button type="submit" class="btn btn-danger">登出</button>
