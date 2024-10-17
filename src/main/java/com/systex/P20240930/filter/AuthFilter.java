@@ -1,5 +1,7 @@
 package com.systex.P20240930.filter;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.systex.P20240930.model.ApiResponse;
 import com.systex.P20240930.model.Member;
 import com.systex.P20240930.service.MemberService;
 import jakarta.servlet.Filter;
@@ -11,17 +13,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
-
 import java.io.IOException;
 
 public class AuthFilter implements Filter {
 
-    @Autowired
-    private MemberService memberService;
+    private final MemberService memberService;
+    private final ObjectMapper objectMapper = new ObjectMapper(); // 用於將物件轉換成 JSON
 
     @Autowired
     public AuthFilter(MemberService memberService) {
-        this.memberService = memberService; // 確保 memberService 被正確注入
+        this.memberService = memberService;
     }
 
     @Override
@@ -34,35 +35,36 @@ public class AuthFilter implements Filter {
         String requestURI = httpRequest.getRequestURI();
 
         boolean loggedIn = (session != null && session.getAttribute("user") != null);
+        System.out.println("請求的 URI: " + requestURI + ", 登入狀態: " + loggedIn);
 
-        // 定義不需要認證的 URI
         String loginURI = httpRequest.getContextPath() + "/login";
         String ajaxLoginURI = httpRequest.getContextPath() + "/ajaxLogin";
         String registerURI = httpRequest.getContextPath() + "/register";
         String checkRegisterURI = httpRequest.getContextPath() + "/checkRegister";
-        boolean isPublicResource = requestURI.equals(loginURI) || requestURI.equals(ajaxLoginURI) 
+        boolean isPublicResource = requestURI.equals(loginURI) || requestURI.equals(ajaxLoginURI)
                 || requestURI.equals(registerURI) || requestURI.equals(checkRegisterURI);
 
         if (!loggedIn && !isPublicResource) {
-            // 如果未登入且不是公共資源，則重定向到登入頁面
             httpResponse.sendRedirect(loginURI);
             return;
         }
 
-        // 處理傳統登入的 POST 請求
+        // 傳統登入處理
         if (requestURI.equals(loginURI) && "POST".equalsIgnoreCase(httpRequest.getMethod())) {
             String account = httpRequest.getParameter("account");
             String password = httpRequest.getParameter("password");
+            System.out.println("處理傳統登入，帳號: " + account);
 
             Member member = memberService.login(account, password);
             if (member != null) {
                 session.setAttribute("user", member);
-                httpResponse.sendRedirect(httpRequest.getContextPath() + "/index"); // 登入成功，重定向到主頁面
+                System.out.println("使用者已登入: " + account);
+                httpResponse.sendRedirect(httpRequest.getContextPath() + "/index");
                 return;
             } else {
-                // 登入失敗，將錯誤訊息存入 session
+            	System.out.println("登入失敗，帳號或密碼錯誤: " + account); 
                 session.setAttribute("errorMessage", "帳號或密碼錯誤！");
-                httpResponse.sendRedirect(loginURI); // 重新導向回登入頁面
+                httpResponse.sendRedirect(loginURI);
                 return;
             }
         }
@@ -73,20 +75,22 @@ public class AuthFilter implements Filter {
             String password = httpRequest.getParameter("password");
 
             Member member = memberService.login(account, password);
+            ApiResponse<Member> apiResponse;
+
             if (member != null) {
                 session.setAttribute("user", member);
-                httpResponse.setStatus(HttpServletResponse.SC_OK); // 設置狀態為 200 OK
-                return; // 返回成功
+                apiResponse = new ApiResponse<>("success", "登入成功", member);
+                httpResponse.setStatus(HttpServletResponse.SC_OK);
             } else {
-                httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 設置狀態為 401 Unauthorized
-                httpResponse.setContentType("application/json"); // 設置內容類型為 JSON
-                // 返回錯誤訊息的 JSON 格式
-                httpResponse.getWriter().write("{\"error\": \"帳號或密碼錯誤！\"}");
-                return;
+                apiResponse = new ApiResponse<>("fail", "帳號或密碼錯誤", null);
+                httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             }
+
+            httpResponse.setContentType("application/json");
+            httpResponse.getWriter().write(objectMapper.writeValueAsString(apiResponse)); // 將 ApiResponse 轉換為 JSON 格式
+            return;
         }
 
-        // 繼續處理請求
         chain.doFilter(request, response);
     }
 

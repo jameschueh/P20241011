@@ -1,5 +1,6 @@
 package com.systex.P20240930.controller;
 
+import com.systex.P20240930.dto.MemberDTO;
 import com.systex.P20240930.model.Member;
 import com.systex.P20240930.service.MemberService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +26,12 @@ public class ProfileController {
     @GetMapping("/profile")
     public String showProfile(HttpSession session, Model model) {
         Member member = (Member) session.getAttribute("user");
-        model.addAttribute("member", member);
+        if (member != null) {
+            MemberDTO memberDTO = new MemberDTO();
+            memberDTO.setId(member.getId());
+            memberDTO.setAccount(member.getAccount());
+            model.addAttribute("member", memberDTO);
+        }
         return "auth/profile"; // 返回個人資料頁面
     }
 
@@ -35,13 +41,16 @@ public class ProfileController {
                                 @RequestParam("password") String password,
                                 RedirectAttributes redirectAttributes) {
         Member member = (Member) session.getAttribute("user");
-        member.setAccount(account);
-        member.setPassword(password); // 這裡可以增加密碼強度檢查
+        if (member != null) {
+            member.setAccount(account);
+            member.setPassword(password); // 密碼會在 service 中加密
 
-        memberService.update(member); // 更新會員資料
-        session.setAttribute("user", member); // 更新session中的使用者資訊
+            memberService.update(member); // 更新會員資料
+            session.setAttribute("user", member); // 更新 session 中的使用者資訊
 
-        redirectAttributes.addFlashAttribute("successMessage", "個人資料更新成功！");
+            redirectAttributes.addFlashAttribute("successMessage", "個人資料更新成功！");
+        }
         return "redirect:/profile"; // 更新成功後重定向到個人資料頁面
     }
+
 }
